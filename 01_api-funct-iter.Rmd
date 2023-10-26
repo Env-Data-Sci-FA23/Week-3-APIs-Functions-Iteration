@@ -195,7 +195,7 @@ parkwide_visitation(year = "1992")
 
 ### Exercise #5 {style="color: maroon"}
 
-**Default our `unit_visitation()` function's arguments related to the starting and ending months to January and December, respectively. This way, we are automatically pulling in data for entire years. Rerun the function for ROMO, EVER, and THRO for the 1980-2021 time period to make sure it works properly.**
+**For our `unit_visitation()` function, make the default arguments for the start and end months January and December, respectively. This way, we are automatically pulling in data for an entire year. Then, rerun the updated 'unit_visitation()' function for ROMO, EVER, and THRO for the 1980-2021 time period to make sure it works properly.**
 
 ```{r}
 
