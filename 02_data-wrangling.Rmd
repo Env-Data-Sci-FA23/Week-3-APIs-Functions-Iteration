@@ -48,7 +48,7 @@ return(final_data)
 years <- (1980:2021)
 
 parkwide <- years %>% 
-  map(~ parkwide_visitation(year = .)) %>% 
+  map(~ parkwide_visitation(year = .x)) %>% 
   bind_rows()
 ```
 
@@ -71,26 +71,26 @@ visitation <- bind_rows(parkwide, units)
 ... except, the rows in `parkwide`'s UnitCode and UnitCode columns are empty. 😑 Let's fix the `UnitCode` column to list "Parkwide" using `mutate()` and an `ifelse()` statement:
 
 ```{r}
-visitation <- visitation %>% mutate(UnitCode = ifelse(is.na(UnitCode), "Parkwide", UnitCode))
+visitation <- visitation %>% mutate(UnitCode = if_else(is.na(UnitCode), "Parkwide", UnitCode))
 ```
 
-Think of the above `ifelse()` operation as: "If the column `UnitCode` is `NA`, replace `NA` with `Parkwide`. Otherwise, preserve what is already in the `UnitCode` column."
+Think of the above `if_else()` operation as: "If the column `UnitCode` is `NA`, replace `NA` with `Parkwide`. Otherwise, preserve what is already in the `UnitCode` column."
 
 Now that we have a single data set containing all of the NPS visitation data that we've pulled, let's start exploring it! But first, let's aggregate the monthly data into annual data using `group_by()` and `summarize()`:
 
 ```{r}
-yearly <- visitation %>%
+annual_visitation <- visitation %>%
   group_by(UnitCode, Year) %>% 
   # we only care about recreational visitors:
   summarize(RecVisitation = sum(RecreationVisitors))
 
-yearly
+annual_visitation
 ```
 
 What does visitation data look like through time? First we can try to graph all of the park units together:
 
 ```{r}
-ggplot(data=yearly)+
+ggplot(data=annual_visitation)+
   geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
   geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
   scale_y_continuous(labels = scales::label_scientific()) +
@@ -102,7 +102,7 @@ ggplot(data=yearly)+
 We can create individual graphs for each unit using `facet_wrap()`, and set the y-axes for each plot to `"free_y"`:
 
 ```{r}
-ggplot(data=yearly) +
+ggplot(data=annual_visitation) +
   geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
   geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
   scale_y_continuous(labels = scales::label_scientific()) +
@@ -114,7 +114,7 @@ We can also make this plot interactive by feeding it into `plotly`'s `ggplotly()
 
 ```{r}
 plotly::ggplotly(
-  ggplot(data=yearly) +
+  ggplot(data=annual_visitation) +
     geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
     geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
     scale_y_continuous(labels = scales::label_scientific()) +
@@ -135,20 +135,20 @@ It is pretty clear that some park units get orders of magnitude more visitors th
 
 ## Pivoting
 
-Currently, our yearly data is considered *narrow* because we have all of our NPS visitation data in one column, with multiple rows representing the same year. We can make this data *wide* by using the function `pivot_wider()`
+Currently, our annual visitation data is considered *long* because we have all of our NPS visitation data in one column, with multiple rows representing the same year. We can make this data *wide* by using the function `pivot_wider()`
 
 ```{r}
-wide_data <- yearly %>%
+wide_data <- annual_visitation %>%
   select(Year, UnitCode, RecVisitation) %>%
   pivot_wider(., names_from = UnitCode, values_from = RecVisitation)
 ```
 
 ... where `names_from` represents the column with the values you are hoping to spread into new columns, and `values_from` represents the data you want to fill these new columns with.
 
-We can make the data set *narrow* again by using the function `pivot_longer()`:
+We can make the data set *long* again by using the function `pivot_longer()`:
 
 ```{r}
-narrow_data <- wide_data %>%
+long_data <- wide_data %>%
   pivot_longer(cols = -Year,
                names_to = "Park",
                values_to = "RecVisitation")
