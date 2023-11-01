@@ -191,7 +191,7 @@ long_data <- wide_data %>%
   ggplot(data=long_data_2) +
   geom_point(aes(x = Year, y = percentage, color = Park)) +
   geom_path(aes(x = Year, y = percentage, color = Park)) +
-  scale_y_continuous(labels = scales::label_scientific()) +
+  scale_y_continuous() +
   #facet_wrap(~visitations, scales = "free_y") +
   theme_bw(base_size=10)
 )
@@ -212,7 +212,25 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
-joined_data_2 <- inner_join(x = joined_data, y = )
+#manipulating dataframe
+joined_data_2 <- joined_data %>%
+  mutate(monthly_total = NonRecreationVisitors.y + RecreationVisitors.y) %>%
+  mutate(park_total = NonRecreationVisitors.x + RecreationVisitors.x)%>%
+  mutate(percentage = (park_total/monthly_total)*100) %>%
+  select(-c(monthly_total, park_total, Month, NonRecreationVisitors.x, NonRecreationVisitors.y, RecreationVisitors.x, RecreationVisitors.y, UnitCode.y, UnitName.y, UnitName.x)) %>%
+  group_by(UnitCode.x, Year) %>%
+  summarize(annual_total = sum(percentage))
+```
+
+```{r}
+#creating the time series plot - this is total visitations, included recreational and non-recreational!
+ plotly::ggplotly(
+  ggplot(data=joined_data_2) +
+  geom_point(aes(x = Year, y = annual_total, color = UnitCode.x)) +
+  geom_path(aes(x = Year, y = annual_total, color = UnitCode.x)) +
+  scale_y_continuous() +
+  theme_bw(base_size=10) + labs(y = "Percentage")
+)
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -220,5 +238,24 @@ joined_data_2 <- inner_join(x = joined_data, y = )
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+#creating an average park visitation dataset
+avg_park_visit_months <- long_data_2 %>%
+  filter(if_all(.col = Year,~ !(.x < 1990))) %>%
+  group_by(Park, Year) %>%
+  summarize(total_visitations = sum(RecVisitation))
 
+#getting the average of highest visitation park from years 1990-2021
+ACAD_avg <- avg_park_visit_months %>%
+  filter(Park == "ACAD") %>%
+  summarise(mean_total_visitations = mean(total_visitations, na.rm = TRUE))
+
+GRSM_avg <- avg_park_visit_months %>%
+  filter(Park == "GRSM") %>%
+  summarise(mean_total_visitations = mean(total_visitations, na.rm = TRUE))
 ```
+
+Answer:
+
+On average, from the years 1990-2021 Great Smokey National Park has the highest visitations with an average of 9,907,814 visits per year.
+
+Acadia National Park has the average lowest visitation, with an average of 2,636,266 visits per year for the years 1990-2021.
