@@ -219,13 +219,23 @@ pull_1992 <- parkwide_visitation(year = 1992)
 **Create a function called `unit_visitation()` that pulls park-specific visitation data for any park, across any time frame. For a list of all park codes, download [this spreadsheet](https://www.nps.gov/aboutus/foia/upload/NPS-Unit-List.xlsx). (Hint 1: functions can have multiple arguments. For this step, you will want arguments representing the start and end month and year, and park unit). Hint 2: Exercise 2 should be used as a starting point for making this function.)**
 
 ```{r}
-#working on this now... not done
-unit_visitation <- function(unit_code, start_month, start_year, end_month, end_year) {
-  
-  raw_data_3 <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes={UNITCODES}&startMonth={STARTMONTH}&startYear={STARTYEAR}&endMonth={ENDMONTH}&endYear={ENDYEAR}", unit_code, start_month, start_year, end_month, end_year))
+install.packages("httr")
+install.packages("jsonlite")
+library(jsonlite)
+library(httr)
+```
 
-  extracted_data_3 <- httr::content(raw_data_3, as = "text", encoding = "UTF-8") 
-  # parse text from JSON to data frame
+```{r}
+#working on this now... not done/not working!
+
+unit_visitation <- function(unit_code, start_month, start_year, end_month, end_year) {
+  raw_data_3 <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unit_code,
+                                       "&startMonth=", start_month,
+                                       "&startYear=", start_year,
+                                       "&endMonth=", end_month,
+                                       "&endYear=", end_year))
+extracted_data_3 <- httr::content(raw_data_3, as = "text", encoding = "UTF-8") 
+
 final_data_3 <- jsonlite::fromJSON(extracted_data_3)
 
 return(final_data_3)
@@ -235,49 +245,16 @@ return(final_data_3)
 test_3 <- unit_visitation(unit_code = "ACAD", start_month = 06, start_year = 2020, end_month = 05, end_year = 2021)
 ```
 
-```{r}
-#example that chatgbt gave 
-unit_visitation <- function(unit_code, start_month, start_year, end_month, end_year) {
-  # Construct the URL with placeholders for parameters
-  url <- paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes={UNITCODES}&startMonth={STARTMONTH}&startYear={STARTYEAR}&endMonth={ENDMONTH}&endYear={ENDYEAR}")
-  
-  # Replace the placeholders with actual values
-  url <- gsub("{UNITCODES}", unit_code, url)
-  url <- gsub("{STARTMONTH}", start_month, url)
-  url <- gsub("{STARTYEAR}", start_year, url)
-  url <- gsub("{ENDMONTH}", end_month, url)
-  url <- gsub("{ENDYEAR}", end_year, url)
-
-  # Send an HTTP GET request to the constructed URL
-  raw_data_3 <- httr::GET(url)
-  
-  # Check if the request was successful
-  if (httr::http_error(raw_data_3)) {
-    stop("HTTP GET request failed.")
-  }
-  
-  extracted_data_3 <- httr::content(raw_data_3, as = "text", encoding = "UTF-8")
-  
-  # Parse text from JSON to data frame
-  final_data_3 <- jsonlite::fromJSON(extracted_data_3)
-  
-  return(final_data_3)
-}
-
-test_3 <- unit_visitation(unit_code = "ACAD", start_month = 06, start_year = 2020, end_month = 05, end_year = 2021)
-```
-
-```{r}
-#test
-test_3 <- unit_visitation(unit_code = ACAD)
-```
-
 ### Exercise #4 {style="color: maroon"}
 
 **Using `unit_visitation()`, pull in visitation data for Rocky Mountain National Park (ROMO), Everglades National Park (EVER), and Theodore Roosevelt National Park (THRO) from November 1992 through December 2021.**
 
 ```{r}
+visitation_rmnp <- unit_visitation(unit_code = "ROMO", start_month = "11", start_year = "1992", end_month = "12", end_year = "2021")
 
+visitation_everglades <- unit_visitation(unit_code = "EVER", start_month = "11", start_year = "1992", end_month = "12", end_year = "2021")
+
+visitation_theodore <- unit_visitation(unit_code = "THRO", start_month = "11", start_year = "1992", end_month = "12", end_year = "2021")
 ```
 
 ## Function Defaults
@@ -313,7 +290,27 @@ parkwide_visitation(year = "1992")
 **For our `unit_visitation()` function, make the default arguments for the start and end months January and December, respectively. This way, we are automatically pulling in data for an entire year. Then, rerun the updated 'unit_visitation()' function for ROMO, EVER, and THRO for the 1980-2021 time period to make sure it works properly.**
 
 ```{r}
+unit_visitation <- function(unit_code, start_month = "01", start_year, end_month = "12", end_year) {
+  raw_data_3 <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unit_code,
+                                       "&startMonth=", start_month,
+                                       "&startYear=", start_year,
+                                       "&endMonth=", end_month,
+                                       "&endYear=", end_year))
+extracted_data_3 <- httr::content(raw_data_3, as = "text", encoding = "UTF-8") 
 
+final_data_3 <- jsonlite::fromJSON(extracted_data_3)
+
+return(final_data_3)
+
+}
+```
+
+```{r}
+visitation_rmnp_2 <- unit_visitation(unit_code = "ROMO", start_year = "1980", end_year = "2021")
+
+visitation_everglades_2 <- unit_visitation(unit_code = "EVER", start_year = "1980", end_year = "2021")
+
+visitation_theodore_2 <- unit_visitation(unit_code = "THRO", start_year = "1980", end_year = "2021")
 ```
 
 # Iterations
@@ -366,7 +363,23 @@ multi_years <- dplyr::bind_rows(output_floop)
 **Use a for loop to run `unit_visitation()` with arguments `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output. (Hint: Your first step will be to create a vector listing each park unit.)**
 
 ```{r}
+#create a vector
+park_units_6 <- c("ROMO", "EVER", "THRO")
 
+#develope empty list for floop
+output_floop_6 <- vector("list", length = length(park_units_6))
+
+#create for loop
+for(i in 1:length(park_units_6)){
+  
+  output_floop_6[[i]] <-
+    unit_visitation(unit_code = park_units_6[i], start_year = 1980, end_year = 2021)
+  
+}
+
+summary(output_floop_6)
+
+multi_parks <- dplyr::bind_rows(output_floop_6)
 ```
 
 ## Mapping
@@ -397,5 +410,11 @@ multi_years <- bind_rows(output_map)
 **Use `map()` to run `unit_visitation()` with arguments `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output.**
 
 ```{r}
+#creating map
+output_map_7 <- park_units_6 %>%
+  map(~ unit_visitation(unit_code = ., start_year = 1980, end_year = 2021))
+#checking that the floop and map have the same outputs
+identical(output_floop_6, output_map_7)
 
+multi_parks_7 <- bind_rows(output_map_7)
 ```
