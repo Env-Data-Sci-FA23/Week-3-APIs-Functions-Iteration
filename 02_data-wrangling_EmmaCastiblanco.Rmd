@@ -130,7 +130,7 @@ plotly::ggplotly(
 )
 ```
 
-### Exercise #2 NEED HELP WITH {style="color: maroon"}
+### Exercise #2  {style="color: maroon"}
 
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
