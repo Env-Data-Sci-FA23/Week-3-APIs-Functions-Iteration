@@ -9,6 +9,28 @@ output: html_document
 knitr::opts_chunk$set(echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5, fig.width=11)
 ```
 
+```{r}
+unit_visitation <- function(unitCodes="ROMO", startMonth=1, startYear=1980, endMonth=11, endYear=2021){
+  
+  
+  url<- paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?",
+                "unitCodes=", unitCodes,
+                "&startMonth=", startMonth,
+                "&startYear=", startYear,
+                "&endMonth=", endMonth,
+                "&endYear=", endYear)
+  
+  packed_data<- GET(url)
+  
+  unpacked_data <- httr:: content(packed_data, as = "text", encoding = "UTF-8")
+  
+  final_data<-jsonlite::fromJSON(unpacked_data)
+  
+  return(final_data)
+
+}
+```
+
 ### Lesson Objectives
 
 In the last lesson, we learned how to pull data from an API and reduce redundancies in our workflows through functions and iteration. In this lesson we will use the functions in the previous lesson to learn how to manipulate data frames with the {tidyverse}, and plot elegant time series graphs with the {ggplot2}, {scales} and {plotly} packages.
@@ -130,7 +152,7 @@ plotly::ggplotly(
 )
 ```
 
-### Exercise #2  {style="color: maroon"}
+### Exercise #2 {style="color: maroon"}
 
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
@@ -198,7 +220,8 @@ wide_data2[, -which(names(wide_data2) == "Year")] <- wide_data2[, -which(names(w
 wide_data3 <- wide_data2[, -which(names(wide_data2) == "Parkwide")] %>%
   gather(wide_data3, y, -Year)
 
-ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
+plotly::ggplotly(
+  ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
   geom_line() +
   labs(
     title= "Visitors by Each Park",
@@ -206,19 +229,7 @@ ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
     y= "Percentage",
     color="Park"
   ) +
-  theme_minimal()
-```
-
-```{r}
-ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
-  geom_line() +
-  labs(
-    title= "Visitors by Each Park",
-    x = "Year",
-    y= "Percentage",
-    color="Park"
-  ) +
-  theme_minimal()
+  theme_minimal())
 ```
 
 ## Joining
@@ -243,7 +254,8 @@ annual_sum<- joined_data %>%
 annual_sum<-
   mutate(annual_sum, percentage_units= (unit_annual/parkwide_annual)*100)
 
-ggplot(annual_sum, aes (x=Year, y=percentage_units, color= UnitCode.x)) +
+plotly::ggplotly(
+  ggplot(annual_sum, aes (x=Year, y=percentage_units, color= UnitCode.x)) +
   geom_line() +
   labs(
     title= "Visitors by Each Park",
@@ -251,7 +263,7 @@ ggplot(annual_sum, aes (x=Year, y=percentage_units, color= UnitCode.x)) +
     y= "Percentage",
     color="Park"
   ) +
-  theme_minimal()
+  theme_minimal())
 ```
 
 ### Exercise #5 {style="color: maroon"}
