@@ -23,6 +23,7 @@ library(httr)
 library(jsonlite)
 library(plotly)
 library(scales)
+library (purrr)
 ```
 
 Using the `parkwide_visitation()` function from the last lesson and mapping, let's pull park-wide visitor data from 1980-2021, and name the final object `parkwide`. (Code hack: we can use `1980:2021` to create a vector of years so we don't have to write each year out!)
@@ -57,6 +58,20 @@ parkwide <- years %>%
 **Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
 
 ```{r}
+unit_visitation <- function(park,startMonth = 1, endMonth = 12, startYear, endYear){
+  
+  park_visit <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", park, "&startMonth=",startMonth,"&startYear=",startYear,"&endMonth=", endMonth,"&endYear=", endYear)) %>%
+  httr::content(as = "text", encoding = "UTF-8")%>%
+  jsonlite::fromJSON()
+  
+  return(park_visit)
+}
+
+parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+
+units <- parks %>%
+  map(~ unit_visitation(park = ., startYear = 1980, endYear = 2021))%>%
+  bind_rows()
 
 ```
 
@@ -128,7 +143,20 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+annual_visitation <- annual_visitation %>%
+  mutate(groups = if_else(UnitCode == "Parkwide", "Parkwide", "Individual Parks"))
 
+plot <- ggplot(data = annual_visitation, aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  geom_point() +
+  geom_path() + 
+  facet_wrap(~groups, scales = "free_y") +
+  theme_bw(base_size = 12) +
+  labs(title = "Annual Visitation",
+       x = "Year",
+       y = "Recreational Visits",
+       color = "Park Unit")
+
+ggplotly(p)
 ```
 
 It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
@@ -161,7 +189,21 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
- 
+wide_data_frac <- wide_data %>%
+  mutate_at(vars(-Year, -Parkwide), ~./Parkwide * 100)
+
+long_data_frac <- wide_data_frac %>%
+  pivot_longer(cols = -Year, values_to = "percent_visitation", names_to = "UnitCode")
+
+p <- ggplot(filter(long_data_frac, UnitCode != "Parkwide"), 
+            aes(x = Year, y = percent_visitation, fill = UnitCode)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(labels = scales::percent) + 
+  theme_minimal() +
+  labs(title = "Park Unit Visitation as Percent of Total",
+       x = "Year", 
+       y = "Percent of Total Visitation")
+ggplotly(p)
 ```
 
 ## Joining
@@ -179,7 +221,24 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
+joined_data_annual <- joined_data %>%
+  group_by(UnitCode.x, Year) %>%
+  summarize(visits = sum(RecreationVisitors.x), 
+            total = sum(RecreationVisitors.y))
 
+
+joined_data_annual <- joined_data_annual %>%
+  mutate(percent = visits/total * 100)
+
+
+ggplot(joined_data_annual, 
+            aes(x = Year, y = percent, fill = UnitCode.x)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Annual Percent Visitation by Park Unit",
+       x = "Year",
+       y = "Percent of Total Visits")
+ggplotly(p)
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -187,5 +246,19 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+long_data_avg <- long_data %>%
+  filter(Year >= 1990, Year <= 2021) %>% 
+  group_by(Park) %>%
+  summarize(avg_visits = mean(RecVisitation))
 
+
+ggplot(long_data_avg %>% filter(Park != "Parkwide"),
+       aes(x = reorder(Park, avg_visits), y = avg_visits)) +
+  geom_col() +
+  labs(title = "Average Annual Park Visitation 1990-2021",
+       x = "Park",
+       y = "Average Annual Visits") +
+  theme_minimal() +
+  coord_flip()
 ```
+GRSM has the highest vistiation (~10,000,000 people). ACAD has the least visitation (2,500,000 people). 
