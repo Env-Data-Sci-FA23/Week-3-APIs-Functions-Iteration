@@ -57,7 +57,31 @@ parkwide <- years %>%
 **Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
 
 ```{r}
+unit_visitation <- function(unitcode, sMonth = "01", sYear, eMonth = "12", eYear){
 
+# pull in the data
+raw_data <- httr::GET(url = 
+                        paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=",unitcode,"&startMonth=",sMonth,"&startYear=",sYear,"&endMonth=",eMonth,"&endYear=",eYear))
+
+# convert content to text
+extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
+
+# parse text from JSON to data frame
+final_data <- jsonlite::fromJSON(extracted_data)
+
+return(final_data)
+
+}
+```
+
+```{r}
+parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+```
+
+```{r}
+units <- parks %>% 
+  map(~unit_visitation(unitcode= ., sYear= 1980, eYear = 2021)) %>% 
+  bind_rows()
 ```
 
 ## Exploring our data
@@ -128,7 +152,18 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+annual_visitation_2 <- annual_visitation %>% 
+  mutate(Parkwide = if_else(UnitCode == "Parkwide", 1, 0)) 
+           
+```
 
+```{r}
+ggplotly(
+  ggplot(data = annual_visitation_2) +
+    geom_point(aes( x= Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes( x= Year, y = RecVisitation, color = UnitCode)) +
+    facet_wrap(~Parkwide, scales = "free_y")
+)
 ```
 
 It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
@@ -161,7 +196,46 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
- 
+#Alternative way of doing this
+
+#wide_data1 <- wide_data %>%
+#  mutate(ACAD = 100*(ACAD/Parkwide),
+#         GRCA = 100*(GRCA/Parkwide)
+#        )
+# wide_data1 <- wide_data %>% 
+#   mutate(PercentACAD = (wide_data[,2]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentGRCA = (wide_data[,3]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentGRSM = (wide_data[,4]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentLAKE = (wide_data[,5]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentOLYM = (wide_data[,6]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentROMO = (wide_data[,8]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentYELL = (wide_data[,9]/wide_data[,7]) * 100)
+# 
+# wide_data1 <- mutate(wide_data1, percentZION = (wide_data[,10]/wide_data[,7]) * 100)
+```
+
+```{r}
+long_data1 <- wide_data %>% 
+  pivot_longer(cols = -c(Year, Parkwide),
+               names_to = "Park", 
+               values_to = "TotalVisitation")
+```
+
+```{r}
+long_data1 <- mutate( long_data1, PercentVis = (TotalVisitation/Parkwide) *100)
+```
+
+```{r}
+ggplotly(
+  ggplot(data = long_data1) +
+    geom_point(aes( x=Year, y= PercentVis, color=Park ))
+)
 ```
 
 ## Joining
@@ -179,7 +253,18 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
+joined_data2 <- joined_data %>% 
+  group_by(Year,UnitCode.x) %>% 
+  summarise(AnnualParkVis= sum(RecreationVisitors.x),
+            AnnualSystem= sum(RecreationVisitors.y)) %>% 
+  mutate(Percent = (AnnualParkVis/AnnualSystem) * 100)
+```
 
+```{r}
+ggplotly(
+  ggplot(data = joined_data2) +
+    geom_point(aes(x=Year, y=Percent, color=UnitCode.x))
+)
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -187,5 +272,10 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
-
+annual_visitation3 <- annual_visitation %>% 
+  filter(Year >= 1990) %>% 
+  group_by(UnitCode) %>% 
+  summarise(sum(RecVisitation))
 ```
+
+The Great Smoky Mountain (GRSM) park has the most visitation, with a total of 317,050,039 visitors from 1990 to 2021. The Acadia (ACAD) park has 84,360,505 from 1990 to 2021.
