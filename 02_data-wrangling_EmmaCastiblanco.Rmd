@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-```{r setup, include = FALSE}
+```{r}
 knitr::opts_chunk$set(echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5, fig.width=11)
 ```
 
@@ -56,7 +56,7 @@ parkwide <- years %>%
 
 **Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
 
-```{r, eval = F}
+```{r}
 
 units_1<- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM") 
 
@@ -135,24 +135,29 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+parkvisitations <- filter(annual_visitation, UnitCode=="Parkwide")
+
 plotly::ggplotly(
-  ggplot(data=annual_visitation) +
-    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
-    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
-    scale_y_continuous(labels = scales::label_scientific()) +
+ ggplot(data=parkvisitations) +
+ geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
     facet_wrap(~UnitCode, scales = "free_y") +
-    theme_bw(base_size=10)
+ theme_bw(base_size=10)
 )
 ```
 
 ```{r}
+
+everythingelse <- filter(annual_visitation, UnitCode != "Parkwide")
+
 plotly::ggplotly(
-  ggplot(data=annual_visitation) +
-    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
-    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
-    scale_y_continuous(labels = scales::label_scientific()) +
-    facet_wrap(~UnitCode, scales = "free_y") +
-    theme_bw(base_size=10)
+ ggplot(data=everythingelse) +
+ geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+ theme_bw(base_size=10)
+)
 ```
 
 It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
@@ -185,7 +190,35 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
-wide_data <- 
+wide_data2 <- wide_data
+wide_data2[, -which(names(wide_data2) == "Year")] <- wide_data2[, -which(names(wide_data2) == "Year")] / wide_data2$Parkwide
+wide_data2[, -which(names(wide_data2) == "Year")] <- wide_data2[, -which(names(wide_data2) == "Year")]*100
+
+
+wide_data3 <- wide_data2[, -which(names(wide_data2) == "Parkwide")] %>%
+  gather(wide_data3, y, -Year)
+
+ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
+  geom_line() +
+  labs(
+    title= "Visitors by Each Park",
+    x = "Year",
+    y= "Percentage",
+    color="Park"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(wide_data3, aes (x=Year, y=y, color= wide_data3)) +
+  geom_line() +
+  labs(
+    title= "Visitors by Each Park",
+    x = "Year",
+    y= "Percentage",
+    color="Park"
+  ) +
+  theme_minimal()
 ```
 
 ## Joining
@@ -203,8 +236,22 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
-unit_alien<- joined_data %>%
-  mutate_at(.vars= units_1, .funs = ~ ())
+annual_sum<- joined_data %>%
+  group_by(Year, UnitCode.x) %>%
+  summarize(unit_annual=sum(RecreationVisitors.x), parkwide_annual=sum(RecreationVisitors.y))
+
+annual_sum<-
+  mutate(annual_sum, percentage_units= (unit_annual/parkwide_annual)*100)
+
+ggplot(annual_sum, aes (x=Year, y=percentage_units, color= UnitCode.x)) +
+  geom_line() +
+  labs(
+    title= "Visitors by Each Park",
+    x = "Year",
+    y= "Percentage",
+    color="Park"
+  ) +
+  theme_minimal()
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -212,5 +259,21 @@ unit_alien<- joined_data %>%
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+  sort(colMeans(wide_data), decreasing=FALSE)
+```
 
+Least Visitation
+
+ZION: mean=
+
+```         
+2589540.3
+```
+
+Most Visitation
+
+GRSM: mean =
+
+```         
+9652271.0 
 ```
