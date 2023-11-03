@@ -350,7 +350,7 @@ output_map
 ... where `~` indicates that we want to perform `parkwide_visitation()` across all years, and `.` indicates that we want to use our piped vector, `years`, as the input to the `year` argument. As you can see, `output_map` is identical to `output_floop`:
 
 ```{r}
-identical(output_floop, output_map)
+identical(output_floop_unit, output_map)
 ```
 
 ... which means we should also `bind_rows()` to get the mapped output into a single data frame:
