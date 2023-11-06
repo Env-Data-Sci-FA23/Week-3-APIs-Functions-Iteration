@@ -146,6 +146,7 @@ plotly::ggplotly(
 annual_visitation <- annual_visitation %>%
   mutate(groups = if_else(UnitCode == "Parkwide", "Parkwide", "Individual Parks"))
 
+#plot
 plot <- ggplot(data = annual_visitation, aes(x = Year, y = RecVisitation, color = UnitCode)) +
   geom_point() +
   geom_path() + 
@@ -176,6 +177,7 @@ wide_data <- annual_visitation %>%
 We can make the data set *long* again by using the function `pivot_longer()`:
 
 ```{r}
+# `long_data`
 long_data <- wide_data %>%
   pivot_longer(cols = -Year,
                names_to = "Park",
@@ -189,12 +191,15 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
+# `wide_data`
 wide_data_frac <- wide_data %>%
   mutate_at(vars(-Year, -Parkwide), ~./Parkwide * 100)
 
 long_data_frac <- wide_data_frac %>%
   pivot_longer(cols = -Year, values_to = "percent_visitation", names_to = "UnitCode")
 
+
+# plot
 p <- ggplot(filter(long_data_frac, UnitCode != "Parkwide"), 
             aes(x = Year, y = percent_visitation, fill = UnitCode)) +
   geom_col(position = "stack") +
@@ -221,6 +226,7 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
+# join data
 joined_data_annual <- joined_data %>%
   group_by(UnitCode.x, Year) %>%
   summarize(visits = sum(RecreationVisitors.x), 
@@ -231,6 +237,7 @@ joined_data_annual <- joined_data_annual %>%
   mutate(percent = visits/total * 100)
 
 
+#plot 
 ggplot(joined_data_annual, 
             aes(x = Year, y = percent, fill = UnitCode.x)) +
   geom_col(position = "stack") +
@@ -246,12 +253,13 @@ ggplotly(p)
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+# most visitation avg
 long_data_avg <- long_data %>%
   filter(Year >= 1990, Year <= 2021) %>% 
   group_by(Park) %>%
   summarize(avg_visits = mean(RecVisitation))
 
-
+# plot
 ggplot(long_data_avg %>% filter(Park != "Parkwide"),
        aes(x = reorder(Park, avg_visits), y = avg_visits)) +
   geom_col() +
