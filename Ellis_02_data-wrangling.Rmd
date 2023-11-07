@@ -58,6 +58,27 @@ parkwide <- years %>%
 
 ```{r}
 
+unit_visitation <- function(unitCodes, startYear, endYear, startMonth = "1", endMonth = "12") {
+  url <- paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?", 
+                "unitCodes=", unitCodes, 
+                "&startMonth=", startMonth, 
+                "&startYear=", startYear, 
+                "&endMonth=", endMonth, 
+                "&endYear=", endYear)
+
+  visitation_data_raw <- GET(url)
+  visitation_data_unpacked <- content(visitation_data_raw, as = "text", encoding = "UTF-8") 
+  visitation_data_final <- fromJSON(visitation_data_unpacked)
+
+  return(visitation_data_final)
+}
+
+parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+start_year <- 1980
+end_year <- 2021
+
+units <- parks %>% 
+  map(~ unit_visitation(unitCode = ., startYear = start_year, endYear = end_year))
 ```
 
 ## Exploring our data
@@ -83,8 +104,6 @@ annual_visitation <- visitation %>%
   group_by(UnitCode, Year) %>% 
   # we only care about recreational visitors:
   summarize(RecVisitation = sum(RecreationVisitors))
-
-annual_visitation
 ```
 
 What does visitation data look like through time? First we can try to graph all of the park units together:
@@ -128,7 +147,26 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+units <- annual_visitation %>% filter(UnitCode != "Parkwide")
 
+each_unit <- ggplotly(ggplot(data=units) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    facet_wrap(~UnitCode, scales = "free_y") +
+    theme_bw(base_size=10))
+
+park_wide_data <- annual_visitation %>% filter(UnitCode == "Parkwide")
+
+park_wide <- ggplotly(ggplot(data=park_wide_data) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()))
+  
+
+interactive <- subplot(each_unit, park_wide, nrows = 2)
+
+ggplotly(interactive)
 ```
 
 It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
@@ -141,6 +179,8 @@ Currently, our annual visitation data is considered *long* because we have all o
 wide_data <- annual_visitation %>%
   select(Year, UnitCode, RecVisitation) %>%
   pivot_wider(., names_from = UnitCode, values_from = RecVisitation)
+
+view(wide_data)
 ```
 
 ... where `names_from` represents the column with the values you are hoping to spread into new columns, and `values_from` represents the data you want to fill these new columns with.
@@ -161,7 +201,24 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
- 
+allparks <- c("ROMO", "YELL", "ACAD", "GRCA", "GRSM", "LAKE", "OLYM", "ZION")
+
+total_vis <- wide_data$Parkwide
+
+unit_percent <- wide_data %>% mutate_at(.vars = allparks, .funs = ~(./total_vis*100))
+
+unit_percent <- unit_percent %>% select(-Parkwide)
+view(unit_percent)
+
+unit_per_long <- unit_percent %>% pivot_longer(cols = -Year, names_to = "ParkUnit", values_to = "RecreationVisitors")
+
+per_vis <- ggplotly(ggplot(data=unit_per_long) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    labs(x = "Year", y = "Park Visitation (% of total)"))
+    
+
+per_vis
 ```
 
 ## Joining
@@ -169,7 +226,18 @@ long_data <- wide_data %>%
 Another way of getting park-wide visitation side-by-side with the park unit data is through the use of joining our original `units` and `parkwide` data sets:
 
 ```{r}
-joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
+#Rerunning this code because I iterated over the units and parkwide variables 
+units_data <- parks %>% 
+  map(~ unit_visitation(unitCode = ., startYear = start_year, endYear = end_year))
+
+#transforming units from a list into a dataframe
+units_dataf <- data.frame(units_data)
+
+parkwide_data <- years %>% 
+  map(~ parkwide_visitation(year = .x)) %>% 
+  bind_rows()
+
+joined_data <- inner_join(x = units_dataf, y = parkwide_data, by = c("Year","Month"))
 ```
 
 ... where `x` and `y` are the two data sets you want joined, and `by` indicates the column(s) to match them by. Note: there are several ways of joining data. Explore them with `` ?`mutate-joins` `` and `` ?`filter-joins` ``.
@@ -180,6 +248,20 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 
 ```{r}
 
+## I struggled with this one... 
+
+data.frame(joined_data)
+
+joined_data_filtered <- joined_data %>% select(contains("UnitCode"), contains("RecreationVisitors"), Year) %>% select(-contains("Non"), -UnitCode.y, -RecreationVisitors.y)
+
+pivoted <- joined_data_filtered %>% pivot_longer(cols = -Year, names_to = , values_to = )
+
+view(pivoted)
+
+```
+
+```{r}
+view(joined_data)
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -187,5 +269,16 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
+data.frame(long_data)
 
+grouped <- long_data %>% filter(Year > 1989) %>% group_by(Park) %>% 
+  summarise(mean = mean(RecVisitation))
+
+
+
+view(grouped) 
+
+# Great Smoky Mountains NP has the most visitation, with an annual average of 9.91 million visitors per year (from 1990 to 2021). 
+
+#Acadia NP has the least visitor, wiht an annual average of 2.64 million visitors per year (from 1990 to 2021).
 ```

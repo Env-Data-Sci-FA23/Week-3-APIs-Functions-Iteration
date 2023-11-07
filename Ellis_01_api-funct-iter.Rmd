@@ -343,8 +343,6 @@ To create the same output as our previous `for` loop on `parkwide_visitation()`,
 ```{r}
 output_map <- years %>% 
   map(~ parkwide_visitation(year = .))
-
-output_map
 ```
 
 ... where `~` indicates that we want to perform `parkwide_visitation()` across all years, and `.` indicates that we want to use our piped vector, `years`, as the input to the `year` argument. As you can see, `output_map` is identical to `output_floop`:
@@ -364,6 +362,10 @@ multi_years <- bind_rows(output_map)
 **Use `map()` to run `unit_visitation()` with arguments `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output.**
 
 ```{r}
-output_map <- parks %>% 
+output_map_parks <- parks %>% 
   map(~ unit_visitation(unitCode = ., startYear = start_year, endYear = end_year))
+
+multi_park <- bind_rows(output_map_parks)
+
+view(multi_park)
 ```
