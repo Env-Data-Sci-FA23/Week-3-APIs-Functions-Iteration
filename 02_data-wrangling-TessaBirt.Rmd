@@ -57,7 +57,10 @@ parkwide <- years %>%
 **Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
 
 ```{r}
-
+parks2 <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+units <- parks2 %>% 
+  map(~ unit_visitation(unit = ., start_year = 1980, end_year = 2021)) %>%
+  bind_rows()
 ```
 
 ## Exploring our data
@@ -128,7 +131,17 @@ plotly::ggplotly(
 **Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
 
 ```{r}
+annual_visitation <- annual_visitation %>%
+  mutate(groups = ifelse(UnitCode == "Parkwide", "Park wide", "Parks"))
 
+plotly::ggplotly(
+  ggplot(data=annual_visitation) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    facet_wrap(~groups, scales = "free_y") +
+    theme_bw(base_size=10)
+)
 ```
 
 It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
@@ -161,7 +174,24 @@ long_data <- wide_data %>%
 **Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
 
 ```{r}
- 
+visitation_percentage <- wide_data %>%
+ mutate_at(.vars = c("ACAD", "ROMO", "GRCA", "LAKE", "YELL", "OLYM", "ZION", "GRSM", "Parkwide"), .fun = ~(. / Parkwide *100))
+
+visitation_percentage_long <- visitation_percentage %>%
+  pivot_longer(cols = -Year,
+               names_to = "Park",
+               values_to = "RecVisitation")
+
+visitation_percentage_long <- visitation_percentage_long %>%
+  filter(Park != "Parkwide")
+
+plotly::ggplotly(
+  ggplot(data=visitation_percentage_long) +
+    geom_point(aes(x = Year, y = RecVisitation, color = Park)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = Park)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    theme_bw(base_size=10)
+)
 ```
 
 ## Joining
@@ -179,7 +209,21 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
 
 ```{r}
+joined_annual_visitation1 <- joined_data %>%
+  group_by(Year, UnitCode.x, UnitCode.y) %>%
+  summarise(RecreationVisitors.x = sum(RecreationVisitors.x), RecreationVisitors.y = sum(RecreationVisitors.y))
 
+joined_annual_visitation <- joined_annual_visitation1 %>%
+  mutate_at(.var = c("RecreationVisitors.x", "RecreationVisitors.y"), .funs = ~(. / RecreationVisitors.y *100)) %>%
+  select(Year, UnitCode.x, RecreationVisitors.x)
+
+plotly::ggplotly(
+  ggplot(data=joined_annual_visitation) +
+    geom_point(aes(x = Year, y = RecreationVisitors.x, color = UnitCode.x)) +
+    geom_path(aes(x = Year, y = RecreationVisitors.x, color = UnitCode.x)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    theme_bw(base_size=10)
+)
 ```
 
 ### Exercise #5 {style="color: maroon"}
@@ -187,5 +231,10 @@ joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
 **Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
 
 ```{r}
-
+units1 <- units %>% 
+  filter(Year >= 1990) %>%
+  group_by(UnitCode) %>%
+  summarise(avg_visitation = mean(RecreationVisitors, na.rm = TRUE))
 ```
+
+GRSM had the most visitation from 1990 to 2021 on average (825651.1) and ACAD had the least (219688.8).
