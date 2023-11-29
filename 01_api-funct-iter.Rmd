@@ -70,7 +70,30 @@ Hooray, you have now successfully pulled in an online data set using an API! ðŸ˜
 **Using the code above as a starting point, pull in monthly NPS-wide visitation data for the years 1980, 1999, and 2018.**
 
 ```{r}
+parkwide_visitation <- function(year = 2018) {
+  
+packed_data <- GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/2018");
 
+unpacked_data <- httr::content(packed_data, as = "text", encoding = "UTF-8") 
+
+final_data <- jsonlite::fromJSON(unpacked_data)
+
+ return(final_data)
+}
+
+#test <- parkwide_visitation(year = 2018)
+
+# for loops
+years <- c(1980, 1999, 2018)
+
+output_floop <- vector ("list", length = length (years))
+
+for(i in 1:length(years)) {
+  output_floop[[i]] >- parkwide_visitation(year = years[i])
+}
+
+multi_years <- output_floop %>%
+bind_rows()
 ```
 
 ### Exercise #2 {style="color: maroon"}
@@ -78,7 +101,9 @@ Hooray, you have now successfully pulled in an online data set using an API! ðŸ˜
 **Now, let's explore the second NPS visitation data set, [visitation](https://irmaservices.nps.gov/v3/rest/stats/help/operations/FetchVisitation). This call pulls in monthly data for a specific park, across a specific time frame. Use your new API skills to pull in visitation data for Rocky Mountain National Park from 2010 through 2021, based on the API's URL template. The unit code for Rocky Mountain National Park is ROMO. (Hint: an API URL can have multiple sections that need to be updated by the user; this one requires the starting month and year, the ending month and year, and the park unit of interest.)**
 
 ```{r}
+raw_data <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes={ROMO}&startMonth={01}&startYear={2010}&endMonth={12}&endYear={2021}")
 
+glimpse(raw_data)
 ```
 
 # Functions
@@ -96,12 +121,9 @@ You may find yourself thinking, *"Wow, exercise 1 was overkill!"* Indeed, you ha
 Let's try making a function called `parkwide_visitation()` that pulls in NPS-wide visitation data for a year of choice. To develop a function requires specific formatting:
 
 ```{r, eval = F}
-<NAME> <- function(<ARGUMENTS>){
-  
-  <ACTIONS>
-  
-  return(<OUTPUT>)
-
+parkwide_visitation <- function(year = 2020){
+raw_data <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/2020")
+  return(final_data)
   }
 ```
 
@@ -110,12 +132,12 @@ Let's try making a function called `parkwide_visitation()` that pulls in NPS-wid
 For `parkwide_visitation()`, we will use our upstream code as the basis for our function, but with a few minor yet extremely important tweaks:
 
 ```{r}
-parkwide_visitation <- function(year){
+parkwide_visitation <- function(year = 2020){
 
 # pull in the data
 raw_data <- httr::GET(url = 
                         # parse out year so that it can be chosen with the "year" argument, using paste0()
-                        paste0("https://irmaservices.nps.gov/v3/rest/stats/total/", year))
+                        paste0("https://irmaservices.nps.gov/v3/rest/stats/total/", 2020))
 
 # convert content to text
 extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
@@ -154,7 +176,22 @@ pull_1992 <- parkwide_visitation(year = 1992)
 **Create a function called `unit_visitation()` that pulls park-specific visitation data for any park, across any time frame. For a list of all park codes, download [this spreadsheet](https://www.nps.gov/aboutus/foia/upload/NPS-Unit-List.xlsx). (Hint 1: functions can have multiple arguments. For this step, you will want arguments representing the start and end month and year, and park unit). Hint 2: Exercise 2 should be used as a starting point for making this function.)**
 
 ```{r}
+unit_visitation <- function(unit, start_month, start_year, end_month, end_year){
+  url <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unit,
+                                "&startMonth=", start_month,
+                                "&startYear=", start_year,
+                                "&endMonth=", end_month, 
+                                "&endYear=", end_year)) 
+  data_messy  <- httr::content(url, as = "text", encoding = "UTF-8")
+  data_clean <- jsonlite::fromJSON(data_messy)
+  return(data_clean)
+}
 
+test <- unit_visitation(unit = "ROMO",
+                        start_month = "01",
+                        start_year = "2005", 
+                        end_month = "12",
+                        end_year = "2015")
 ```
 
 ### Exercise #4 {style="color: maroon"}
@@ -162,7 +199,34 @@ pull_1992 <- parkwide_visitation(year = 1992)
 **Using `unit_visitation()`, pull in visitation data for Rocky Mountain National Park (ROMO), Everglades National Park (EVER), and Theodore Roosevelt National Park (THRO) from November 1992 through December 2021.**
 
 ```{r}
+unit_visitation <- function(unit, start_month, start_year, end_month, end_year){
+  url <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unit,
+                                "&startMonth=", start_month,
+                                "&startYear=", start_year,
+                                "&endMonth=", end_month, 
+                                "&endYear=", end_year)) 
+  data_messy  <- httr::content(url, as = "text", encoding = "UTF-8")
+  data_clean <- jsonlite::fromJSON(data_messy)
+  return(data_clean)
+}
 
+test <- unit_visitation(unit = "ROMO",
+                        start_month = "01",
+                        start_year = "1992", 
+                        end_month = "12",
+                        end_year = "2021")
+
+test <- unit_visitation(unit = "EVER",
+                        start_month = "01",
+                        start_year = "1992", 
+                        end_month = "12",
+                        end_year = "2021")
+
+test <- unit_visitation(unit = "THRO",
+                        start_month = "01",
+                        start_year = "1992", 
+                        end_month = "12",
+                        end_year = "2021")
 ```
 
 ## Function Defaults
@@ -183,7 +247,6 @@ final_data <- jsonlite::fromJSON(extracted_data)
 return(final_data)
 
 }
-
 parkwide_visitation()
 ```
 
@@ -198,7 +261,12 @@ parkwide_visitation(year = "1992")
 **For our `unit_visitation()` function, make the default arguments for the start and end months January and December, respectively. This way, we are automatically pulling in data for an entire year. Then, rerun the updated 'unit_visitation()' function for ROMO, EVER, and THRO for the 1980-2021 time period to make sure it works properly.**
 
 ```{r}
+unit_visitation <- function(park_code, start_year, end_year, start_month=1, end_month=12) {
 
+unit_visitation("ROMO", 1980, 2021)
+unit_visitation("EVER", 1980, 2021)
+unit_visitation("THRO", 1980, 2021)
+}
 ```
 
 # Iterations
@@ -251,7 +319,20 @@ multi_years <- dplyr::bind_rows(output_floop)
 **Use a for loop to run `unit_visitation()` with arguments `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output. (Hint: Your first step will be to create a vector listing each park unit.)**
 
 ```{r}
+# vector of park units
+park_units <- c("ROMO", "EVER", "THRO")
 
+# empty data framae
+output_df <- data.frame()
+
+# loop
+for (park in park_units) {
+  output <- unit_visitation(park, 1980, 2021)
+  output_df <- rbind(output_df, output)
+}
+
+# output data frame
+output_df
 ```
 
 ## Mapping
@@ -282,5 +363,15 @@ multi_years <- bind_rows(output_map)
 **Use `map()` to run `unit_visitation()` with arguments `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output.**
 
 ```{r}
+# vector of park units
+park_units <- c("ROMO", "EVER", "THRO")
 
+#  map() to run unit_visitation() w arguments
+output_list <- map(park_units, ~unit_visitation(.x, 1980, 2021))
+
+# single data frame
+output_df <- bind_rows(output_list)
+
+# view output df
+output_df
 ```
