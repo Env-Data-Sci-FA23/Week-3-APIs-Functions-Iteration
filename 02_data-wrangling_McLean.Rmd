@@ -1,0 +1,366 @@
+---
+title: "3.2: Data Wrangling and Visualization"
+author: "Billy McLean"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE, rows.print=5, fig.width=11)
+```
+
+### Lesson Objectives
+
+In the last lesson, we learned how to pull data from an API and reduce redundancies in our workflows through functions and iteration. In this lesson we will use the functions in the previous lesson to learn how to manipulate data frames with the {tidyverse}, and plot elegant time series graphs with the {ggplot2}, {scales} and {plotly} packages.
+
+There are **five exercises** in this lesson that must be completed.
+
+## Pulling in necessary packages and data sets
+
+```{r}
+library(tidyverse) # ggplot2 is included in the {tidyverse}
+library(httr)
+library(jsonlite)
+library(plotly)
+library(scales)
+```
+
+Using the `parkwide_visitation()` function from the last lesson and mapping, let's pull park-wide visitor data from 1980-2021, and name the final object `parkwide`. (Code hack: we can use `1980:2021` to create a vector of years so we don't have to write each year out!)
+
+```{r}
+unit_visitation1 <- function(unitCode, startMonth = 01, startYear, endMonth = 12, endYear){
+  
+raw_data <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unitCode, "&startMonth=", startMonth, "&startYear=", startYear, "&endMonth=", endMonth, "&endYear=", endYear))
+
+
+# convert content to text
+extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
+
+# parse text from JSON to data frame
+final_data <- jsonlite::fromJSON(extracted_data)
+
+return(final_data)
+
+  
+}
+```
+
+
+
+```{r}
+parkwide_visitation <- function(year){
+
+# pull in the data
+raw_data <- httr::GET(url = 
+                        # parse out year so that it can be chosen with the "year" argument, using paste0()
+                        paste0("https://irmaservices.nps.gov/v3/rest/stats/total/", year))
+
+# convert content to text
+extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
+
+# parse text from JSON to data frame
+final_data <- jsonlite::fromJSON(extracted_data)
+
+return(final_data)
+
+}
+
+years <- (1980:2021)
+
+parkwide <- years %>% 
+  map(~ parkwide_visitation(year = .x)) %>% 
+  bind_rows()
+```
+
+### Exercise #1 {style="color: maroon"}
+
+**Using the `unit_visitation()` function from the last lesson and mapping, pull visitor data from 1980-2021 for the following park units: ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final output `units`.**
+
+```{r}
+
+ParkList1 <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+
+
+units1 <- ParkList1 %>% 
+  map(~ unit_visitation1(unitCode = ., startYear = 1980, endYear = 2021))
+
+
+units <- bind_rows(units1)
+```
+
+## Exploring our data
+
+Look at the data frame structure of `parkwide` and `units`; they're exactly the same! So let's go ahead and bind those together:
+
+```{r}
+visitation <- bind_rows(parkwide, units)
+```
+
+... except, the rows in `parkwide`'s UnitCode and UnitCode columns are empty. 😑 Let's fix the `UnitCode` column to list "Parkwide" using `mutate()` and an `ifelse()` statement:
+
+```{r}
+visitation <- visitation %>% mutate(UnitCode = if_else(is.na(UnitCode), "Parkwide", UnitCode))
+```
+
+
+Think of the above `if_else()` operation as: "If the column `UnitCode` is `NA`, replace `NA` with `Parkwide`. Otherwise, preserve what is already in the `UnitCode` column."
+
+Now that we have a single data set containing all of the NPS visitation data that we've pulled, let's start exploring it! But first, let's aggregate the monthly data into annual data using `group_by()` and `summarize()`:
+
+```{r}
+annual_visitation <- visitation %>%
+  group_by(UnitCode, Year) %>% 
+  # we only care about recreational visitors:
+  summarize(RecVisitation = sum(RecreationVisitors))
+
+annual_visitation
+
+```
+
+What does visitation data look like through time? First we can try to graph all of the park units together:
+
+```{r}
+ggplot(data=annual_visitation)+
+  geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  theme_bw(base_size=10)
+```
+
+... yikes, not surprisingly, parkwide visitation is wayyyy higher than our individual unit's visitation data, making our graph pretty useless. It might be nice to have each park unit in a graph of its own.
+
+We can create individual graphs for each unit using `facet_wrap()`, and set the y-axes for each plot to `"free_y"`:
+
+```{r}
+ggplot(data=annual_visitation) +
+  geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  facet_wrap(~UnitCode, scales = "free_y") +
+  theme_bw(base_size=10)
+```
+
+We can also make this plot interactive by feeding it into `plotly`'s `ggplotly()` function:
+
+```{r}
+plotly::ggplotly(
+  ggplot(data=annual_visitation) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    facet_wrap(~UnitCode, scales = "free_y") +
+    theme_bw(base_size=10)
+)
+```
+
+### Exercise #2 {style="color: maroon"}
+
+**Create an interactive graph with two separate panes: one showing park-wide visitation, the other showing all the individual park units together. Both panes should have different y-axes.**
+
+<!-- Group our Unit Codes to either be "Park" or "ParkWide"-->
+```{r}
+annual_visitation <- annual_visitation %>%
+  mutate(groups = if_else(UnitCode == "Parkwide", "Park Wide", "Parks"))
+```
+
+<!-- Now use the altered df in the plot and facet wrap by the new "groups" column -->
+
+```{r}
+plotly::ggplotly(
+  ggplot(data=annual_visitation) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    facet_wrap(~groups, scales = "free_y") +
+    theme_bw(base_size=10)
+)
+```
+
+
+It is pretty clear that some park units get orders of magnitude more visitors than others. But just how much of the total park visitation do each of these parks account for from year to year? Here we walk through two methods to tackle this question, ***pivoting*** and ***joining***, to get park unit visitation side-by-side with park-wide data.
+
+## Pivoting
+
+Currently, our annual visitation data is considered *long* because we have all of our NPS visitation data in one column, with multiple rows representing the same year. We can make this data *wide* by using the function `pivot_wider()`
+
+```{r}
+wide_data <- annual_visitation %>%
+  select(Year, UnitCode, RecVisitation) %>%
+  pivot_wider(., names_from = UnitCode, values_from = RecVisitation)
+```
+
+... where `names_from` represents the column with the values you are hoping to spread into new columns, and `values_from` represents the data you want to fill these new columns with.
+
+We can make the data set *long* again by using the function `pivot_longer()`:
+
+```{r}
+long_data <- wide_data %>%
+  pivot_longer(cols = -Year,
+               names_to = "Park",
+               values_to = "RecVisitation")
+```
+
+... where `cols` are the columns we want to gather into one column (or, the column(s) you DON'T want to gather), while `names_to` and `values_to` are the names and values for the new columns produced from the pivot.
+
+### Exercise #3 {style="color: maroon"}
+
+**Using `wide_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. In other words, a visual that allows us to see how much each park unit contributes to the total park visitation across the NPS system.**
+
+<!-- Reorder the data to make it pretty -->
+```{r}
+wide_data <- wide_data %>% 
+  select(Year, ACAD, GRCA, LAKE, ROMO, YELL, ZION, OLYM, GRSM, Parkwide)
+```
+
+<!-- Mutate across the columns to get percentages, writing it out the long way to get a neat value for Parkwide as well -->
+
+```{r}
+wide_data_percentages_decimals <- wide_data %>%
+  mutate_at(.vars = c("ACAD", "GRCA", "LAKE", "ROMO", "YELL", "ZION","OLYM", "GRSM", "Parkwide"), .funs = ~(. / Parkwide))
+
+view(wide_data_percentages_decimals)
+```
+
+
+```{r}
+wide_data_percentages <- wide_data_percentages_decimals %>%
+  mutate_at(.vars = c("ACAD", "GRCA", "LAKE", "ROMO", "YELL", "ZION","OLYM", "GRSM", "Parkwide"), .funs = ~(. *100))
+
+view(wide_data_percentages)
+```
+
+
+```{r}
+long_data_percentages <- wide_data_percentages %>%
+  pivot_longer(cols = -Year,
+               names_to = "Park",
+               values_to = "RecVisitation_Percent")
+```
+
+```{r}
+long_data_percentages5 <- long_data_percentages %>% 
+  filter(Park != "Parkwide")
+```
+
+
+```{r}
+plotly::ggplotly(
+  ggplot(data=long_data_percentages5) +
+    # geom_area(mapping = aes(x = Year, y = RecVisitation_Percent, fill = Park), alpha = 0.3, position = "identity")+
+    geom_point(aes(x = Year, y = RecVisitation_Percent, color = Park)) +
+    geom_path(aes(x = Year, y = RecVisitation_Percent, color = Park)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    #facet_wrap(~Park, scales = "free_y") +
+    theme_bw(base_size=10)
+)
+```
+
+## Joining
+
+Another way of getting park-wide visitation side-by-side with the park unit data is through the use of joining our original `units` and `parkwide` data sets:
+
+```{r}
+joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
+```
+
+... where `x` and `y` are the two data sets you want joined, and `by` indicates the column(s) to match them by. Note: there are several ways of joining data. Explore them with `` ?`mutate-joins` `` and `` ?`filter-joins` ``.
+
+### Exercise #4 {style="color: maroon"}
+
+**Using `joined_data` as the starting point, create an interactive time series plot showing the annual percentage of the total visitation made up by all park units. This plot should look nearly identical to the previous plot.**
+
+
+```{r}
+joined_visitation <- joined_data %>% mutate(UnitCode.y = if_else(is.na(UnitCode.y), "Parkwide", UnitCode.y))
+```
+
+
+```{r}
+joined_annual_visitation <- joined_visitation %>% 
+  group_by(Year, UnitCode.x, UnitCode.y) %>% 
+  summarize(RecVisitation.x = sum(RecreationVisitors.x),RecVisitation.y = sum(RecreationVisitors.y))
+
+joined_annual_visitation
+```
+
+
+```{r}
+joined_annual_visitation1 <- joined_annual_visitation %>%
+  mutate_at(.vars = c("RecVisitation.x", "RecVisitation.y"), .funs = ~(. / RecVisitation.y))
+```
+
+```{r}
+joined_annual_visitation2 <- joined_annual_visitation1 %>%
+  mutate_at(.vars = c("RecVisitation.x", "RecVisitation.y"), .funs = ~(. * 100))
+```
+
+
+```{r}
+joined_annual_visitation3 <- joined_annual_visitation2 %>% 
+  select(Year, UnitCode.x, RecVisitation.x)
+```
+
+
+
+```{r}
+plotly::ggplotly(
+  ggplot(data=joined_annual_visitation3) +
+    geom_point(aes(x = Year, y = RecVisitation.x, color = UnitCode.x)) +
+    geom_path(aes(x = Year, y = RecVisitation.x, color = UnitCode.x)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    # facet_wrap(~Park, scales = "free_y") +
+    theme_bw(base_size=10)
+)
+```
+
+
+
+
+
+### Exercise #5 {style="color: maroon"}
+
+**Which park on average has the most visitation? Which park has the least visitation? Base your response on the data starting in 1990, ending in 2021. Defend your answer with numbers!**
+
+```{r}
+# view(units)
+
+units1 <- units %>% 
+  filter(Year > 1989)
+```
+
+
+```{r}
+units2 <- units1 %>%
+  group_by(Year, UnitCode) %>% 
+  summarize(RecVisitors = mean(RecreationVisitors))
+  
+```
+
+
+```{r}
+plotly::ggplotly(
+  ggplot(data=units2) +
+    geom_point(aes(x = Year, y = RecVisitors, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitors, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    # facet_wrap(~Park, scales = "free_y") +
+    theme_bw(base_size=10)
+)
+```
+
+Based on the plot it looks like Great Smokey Mountains has the highest average recreational visitation and Acadia has the lowest
+
+Lets get the actual numbers by averaging visitation for each park over all of the years and arranging them from highest to lowest
+
+```{r}
+means <- units2 %>% 
+  group_by(UnitCode) %>% 
+  summarize(AverageVisitation = mean(RecVisitors)) %>% 
+  arrange(desc(AverageVisitation))
+
+tibble(means)
+  
+```
+
+Huzzah! Great Smokey Moutain has had the highest average visitation and Acadia the lowest.
+
