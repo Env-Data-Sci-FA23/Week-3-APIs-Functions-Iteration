@@ -1,0 +1,229 @@
+---
+title: "Week3"
+author: "April Shelhon"
+date: "2023-10-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE, warning = FALSE, rows.print=5)
+```
+
+```{r}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+```
+
+```{r}
+raw_data <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/1992")
+glimpse(raw_data)
+```
+
+```{r}
+raw_data
+unpacked_data <- httr::content(raw_data, as = "text", encoding = "UTF-8")
+```
+
+```{r}
+final_data <- jsonlite::fromJSON(unpacked_data)
+final_data
+```
+
+Exercise 1
+
+```{r}
+raw_data_1980 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/1980")
+glimpse(raw_data_1980)
+```
+
+```{r}
+raw_data_1980
+unpacked_data_1980 <- httr::content(raw_data_1980, as = "text", encoding = "UTF-8")
+```
+
+```{r}
+final_data_1980 <- jsonlite::fromJSON(unpacked_data_1980)
+final_data_1980
+```
+
+```{r}
+raw_data_99 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/1999")
+glimpse(raw_data_99)
+```
+
+```{r}
+raw_data_99
+unpacked_data_99 <- httr::content(raw_data_99, as = "text", encoding = "UTF-8")
+```
+
+```{r}
+final_data_99 <- jsonlite::fromJSON(unpacked_data_99)
+final_data_99
+```
+
+```{r}
+raw_data_2018 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/2018")
+glimpse(raw_data_2018)
+```
+
+```{r}
+raw_data_2018
+unpacked_data_2018 <- httr::content(raw_data_2018, as = "text", encoding = "UTF-8")
+```
+
+```{r}
+final_data_2018 <-
+  jsonlite::fromJSON(unpacked_data_2018)
+final_data_2018
+```
+
+Exercise 2
+
+```{r} 
+raw_data_10_21 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest//statsvisitation?unitCodes=ROMO&startMonth=1&startYear=2010&endMonth=12&endYear=2021")
+glimpse(raw_data_10_21)
+                        
+```
+
+(hint:for graph use facets and use variable to seperate. Mutate add column park_wide or park)
+
+Functions
+
+```{r}
+parkwide_visitation <- function(year){
+  raw_data <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/total/", year))
+  extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
+  final_data <- jsonlite::fromJSON(extracted_data)
+
+return(final_data)
+}
+```
+
+```{r}
+pull_2018 <- parkwide_visitation(year = 2018)
+
+pull_1980 <- parkwide_visitation(year = 1980)
+
+pull_1992 <- parkwide_visitation(year = 1992)
+```
+
+Exercise 3
+
+```{r}
+unit_visitation <- function(unit, start_month, start_year, end_month, end_year){
+raw_data <- GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=", unit, "&startMonth=", start_month, "&startYear=", start_year, "&endMonth=", end_month, "&endYear=", end_year))
+
+extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8")
+
+final_data <- jsonlite::fromJSON(extracted_data)
+
+return(final_data)}
+
+```
+
+```{r}
+test <- unit_visitation(unit = "SHEN", start_month = "01", start_year = "2000", end_month = "12", end_year = "2020")
+```
+
+Exercise 4
+
+```{r}
+visit_ROMO_1992_2021 <- unit_visitation(unit = "ROMO", start_month = "11", start_year = "2021", end_month = "12", end_year = "2021")
+```
+
+```{r}
+visit_EVER_1992_2021 <- unit_visitation(unit = "EVER", start_month = "11", start_year = "2021", end_month = "12", end_year = "2021")
+```
+
+```{r}
+visit_THRO_1992_2021 <- unit_visitation(unit = "THRO", start_month = "11", start_year = "2021", end_month = "12", end_year = "2021")
+```
+
+```{r}
+parkwide_visitation <- function(year = "2021") {
+raw_data <- httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/total/", year))
+extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8") 
+final_data <- jsonlite::fromJSON(extracted_data)
+return(final_data)
+}
+parkwide_visitation()
+```
+
+```{r}
+parkwide_visitation(year = "1992")
+```
+
+For loops
+
+```{r}
+years <- c('2017', '2018', '2019', '2020', '2021')
+```
+
+```{r}
+output_floop <- vector("list", length = length(years))
+```
+
+```{r}
+for(i in 1:length(years)){
+  
+  output_floop[[i]] <-
+    parkwide_visitation(year = years[i])
+  
+}
+```
+
+```{r}
+summary(output_floop)
+```
+
+```{r}
+multi_years <- dplyr::bind_rows(output_floop)
+```
+
+Exercise 6
+
+```{r}
+units <- c("ROMO", "EVER", "THRO")
+```
+
+```{r}
+output_floop_units <- vector("list", length = length(units))
+```
+
+```{r}
+test2 <- unit_visitation(unit = units[1], start_month = "01", start_year = "1980", end_month = "12", end_year = "2021")
+```
+
+
+```{r}
+for(i in 1:length(units)){
+  output_floop_units[[i]] <- unit_visitation(unit = units[i], start_month = "01", start_year = "1980", end_month = "12", end_year = "2021")
+}
+```
+
+```{r}
+output_map <- years %>% 
+  map(~ parkwide_visitation(year = .))
+```
+
+```{r}
+identical(output_floop, output_map)
+```
+
+```{r}
+multi_years <- bind_rows(output_map)
+```
+
+Exercise 7
+Use map() to run unit_visitation() with arguments start_year = 1980 and end_year = 2021 across ROMO, EVER, and THRO. Then, create a single data frame containing each park units' output.
+
+```{r}
+years2 <- c(1980:2021)
+```
+
+```{r}
+output_map2 <- units %>%
+  map(~ unit_visitation(unit = ., start_month = "01", start_year = 1980, end_month = "12", end_year = "2021"))
+```
+
